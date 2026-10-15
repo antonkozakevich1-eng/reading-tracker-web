@@ -8,9 +8,14 @@
 
   interface Props {
     sensitivity?: number;
+    /** Распознанные слова наружу — для трекера. */
+    onPartial?: (text: string) => void;
+    onFinal?: (text: string) => void;
+    /** Прослушивание включилось/выключилось. */
+    onListening?: (listening: boolean) => void;
   }
 
-  let { sensitivity = 60 }: Props = $props();
+  let { sensitivity = 60, onPartial, onFinal, onListening }: Props = $props();
 
   /** Распознанные фразы для показа. */
   let finals: string[] = $state([]);
@@ -24,11 +29,13 @@
   const engine = new SpeechEngine({
     onPartial: (text) => {
       partial = text;
+      onPartial?.(text);
     },
     onFinal: (text) => {
       finals = [...finals.slice(-40), text];
       partial = '';
       console.log('[final]', text);
+      onFinal?.(text);
     },
     onLevel: (l) => {
       level = l;
@@ -39,6 +46,7 @@
         partial = '';
         level = 0;
       }
+      onListening?.(v);
     },
     onError: (msg) => {
       error = msg;

@@ -1,46 +1,61 @@
 <script lang="ts">
   /**
-   * Область чтения. Порт android ReaderView.
+   * Область чтения. Порт ReaderView.kt.
    *
-   * Рендерит секцию документа как поток слов, подсвечивает прочитанное
-   * и текущее слово («pill»), поддерживает автопрокрутку с паузой
-   * после ручного скролла и долгое нажатие для перескока.
+   * Портируемая логика:
+   *  - подсветка текущего слова и приглушение прочитанного (readSpan + pillTextSpan);
+   *  - «плашка» на текущем слове (PillView) — рисуется под текстом, alpha зависит от locked;
+   *  - автопрокрутка scrollToCursor(): порог 12%/62% видимой области, цель — 30% от верха,
+   *    пауза USER_SCROLL_PAUSE_MS = 4000 мс после касания пользователем;
+   *  - долгое нажатие на слово → перескок (onLongPress с offset).
    */
-  import { onMount, onDestroy } from 'svelte';
+  import { onDestroy } from 'svelte';
   import type { Doc } from '../lib/text/Doc';
 
   interface Props {
     doc: Doc | null;
     /** Текущая позиция в словах (абсолютная по документу). */
     position: number;
+    /** Подсветка уверена (плотная плашка) или поиск места (бледная). */
+    locked?: boolean;
     /** Индекс секции для отображения. */
     sectionIndex: number;
     fontSp?: number;
     serif?: boolean;
     lineSpacing?: number;
     autoScroll?: boolean;
-    /** Вызывается при долгом нажатии на слово. */
+    /** forceScroll — прокрутить принудительно, игнорируя паузу. */
+    forceScrollToken?: number;
+    /** Долгое нажатие на слово: индекс слова в документе. */
     onSeekWord?: (word: number) => void;
   }
 
   let {
     doc,
     position,
+    locked = true,
     sectionIndex,
     fontSp = 22,
     serif = true,
     lineSpacing = 1.35,
     autoScroll = true,
+    forceScrollToken = 0,
     onSeekWord
   }: Props = $props();
 
-  /** Пауза автопрокрутки после ручного взаимодействия (как в оригинале). */
+  /** Пауза автопрокрутки после ручного взаимодействия (как USER_SCROLL_PAUSE_MS). */
   const USER_SCROLL_PAUSE_MS = 4000;
 
+  /** Длительность долгого нажатия. */
+  const LONG_PRESS_MS = 500;
+
   let scrollEl: HTMLDivElement | undefined = $state();
-  let lastUserScroll = 0;
-  /** Элементы слов: нужны, чтобы прокрутить к текущему. */
-  let wordEls: (HTMLElement | undefined)[] = $state([]);
+
+  /** Время последнего касания пользователем — пока не прошло 4 с, автопрокрутка молчит. */
+  let lastUserTouch = 0;
+
+  /** Слово, на котором стоит подсветка (абсолютный индекс), либо -1. */
+  const cursorWord = $derived(position);
 
   /** Секция, которую сейчас показываем. */
   const section = $derived(
@@ -50,95 +65,185 @@
   );
 
   /**
-   * Слова секции с их абсолютными индексами.
+   * Слова секции с абсолютными индексами.
    * Нужны, чтобы подсветка знала границы и могла сопоставить позицию.
    */
   const sectionWords = $derived.by(() => {
     if (!doc || !section) return [];
-    const out: { word: number; text: string; start: number; end: number }[] = [];
+    const out: { word: number; text: string }[] = [];
     for (let i = section.firstWord; i < section.endWord && i < doc.size; i++) {
       out.push({
         word: i,
-        text: doc.text.slice(doc.wordStart[i]!, doc.wordEnd[i]!),
-        start: doc.wordStart[i]! - section.start,
-        end: doc.wordEnd[i]! - section.start
+        text: doc.text.slice(doc.wordStart[i]!, doc.wordEnd[i]!)
       });
     }
     return out;
   });
 
-  /** Текущее слово в координатах секции. */
-  const cursorWord = $derived(position);
-
   /** Индекс текущего слова внутри sectionWords. */
-  const cursorIndex = $derived(
-    sectionWords.findIndex((w) => w.word >= cursorWord)
-  );
+  const cursorIndex = $derived(sectionWords.findIndex((w) => w.word >= cursorWord));
 
-  /** Прокручивает так, чтобы текущее слово было видно. */
+  // --- ссылки на элементы слов для прокрутки ---
+
+  let wordEls: (HTMLElement | undefined)[] = $state([]);
+
+  /** Программная прокрутка не должна считаться ручной. */
+  let programmaticScroll = false;
+
+  /** Порт scrollToCursor(force). */
   function scrollToCursor(force: boolean): void {
-    if (!scrollEl) return;
+    if (cursorIndex < 0) return;
 
-    // Ручной скролл пользователем недавно — не мешаем
-    if (!force && Date.now() - lastUserScroll < USER_SCROLL_PAUSE_MS) return;
-
-    const idx = cursorIndex;
-    const target = idx >= 0 ? wordEls[idx] : undefined;
-    if (!target) return;
+    // !force && (!autoScroll || прошло меньше 4 с после касания) → не трогаем
+    if (!force && (!autoScroll || Date.now() - lastUserTouch < USER_SCROLL_PAUSE_MS)) {
+      return;
+    }
 
     const el = scrollEl;
+    const target = wordEls[cursorIndex];
+    if (!el || !target) return;
+
+    const h = el.clientHeight;
+    if (h <= 0) {
+      requestAnimationFrame(() => scrollToCursor(force));
+      return;
+    }
+
     const elRect = el.getBoundingClientRect();
     const tRect = target.getBoundingClientRect();
 
-    const targetTop = tRect.top - elRect.top + el.scrollTop;
-    const desired = targetTop - el.clientHeight * 0.4;
+    // Координаты цели относительно содержимого прокрутки
+    const top = tRect.top - elRect.top + el.scrollTop;
+    const bottom = tRect.bottom - elRect.top + el.scrollTop;
+    const y = el.scrollTop;
 
-    if (Math.abs(el.scrollTop - desired) < 4) return;
+    // force || top < y + h*0.12 || bottom > y + h*0.62
+    if (force || top < y + h * 0.12 || bottom > y + h * 0.62) {
+      const dest = Math.max(0, Math.trunc(top - h * 0.3));
 
-    el.scrollTo({ top: Math.max(0, desired), behavior: 'smooth' });
+      // Помечаем прокрутку как нашу: событие scroll не должно
+      // обнулять таймер пользовательского касания
+      programmaticScroll = true;
+      el.scrollTo({ top: dest, behavior: force ? 'auto' : 'smooth' });
+
+      const clear = (): void => {
+        programmaticScroll = false;
+      };
+      if (force) {
+        requestAnimationFrame(clear);
+      } else {
+        // Плавная прокрутка идёт ~300 мс
+        setTimeout(clear, 400);
+      }
+    }
   }
 
-  /** Автопрокрутка при смене позиции. */
+  // --- реакция на смену позиции ---
+
   $effect(() => {
-    // Зависимости: позиция и настройка
+    // Зависимости
     void cursorWord;
     void autoScroll;
-    if (!autoScroll) return;
 
-    // Ждём, пока pill отрисуется
     requestAnimationFrame(() => scrollToCursor(false));
   });
 
-  /** Прокрутка при смене секции — принудительно. */
+  // Принудительная прокрутка по внешнему сигналу (смена секции, seek, смена шрифта)
   $effect(() => {
     void sectionIndex;
-    // Сбрасываем ссылки: секция перерисована
+    void forceScrollToken;
+
     wordEls = [];
-    requestAnimationFrame(() => scrollToCursor(true));
+    requestAnimationFrame(() => requestAnimationFrame(() => scrollToCursor(true)));
   });
 
-  function handleUserScroll(): void {
-    lastUserScroll = Date.now();
+  // --- отслеживание касаний пользователя ---
+
+  function markUserTouch(): void {
+    lastUserTouch = Date.now();
   }
 
-  // --- Долгое нажатие ---
+  function onWheel(): void {
+    markUserTouch();
+  }
+
+  function onKeyDown(e: KeyboardEvent): void {
+    // Стрелки, PageUp/PageDown, Home/End — ручная прокрутка
+    const keys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '];
+    if (keys.includes(e.key)) markUserTouch();
+  }
+
+  // Выделение текста тоже задерживает автопрокрутку
+  function onSelectionChange(): void {
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed) markUserTouch();
+  }
+
+  $effect(() => {
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('selectionchange', onSelectionChange);
+    };
+  });
+
+  // Тач-скролл и перетаскивание полосы прокрутки тоже считаются ручным листанием.
+  // Вешаем нативно: тач-скролл не даёт pointerdown на контейнере.
+  $effect(() => {
+    const el = scrollEl;
+    if (!el) return;
+
+    const touch = (): void => markUserTouch();
+    const down = (e: MouseEvent): void => {
+      // Только сам скроллбар (клик по тексту обрабатывают слова)
+      if (e.target === el) markUserTouch();
+    };
+
+    el.addEventListener('touchstart', touch, { passive: true });
+    el.addEventListener('touchmove', touch, { passive: true });
+    el.addEventListener('mousedown', down);
+    el.addEventListener('scroll', onScroll, { passive: true });
+
+    return () => {
+      el.removeEventListener('touchstart', touch);
+      el.removeEventListener('touchmove', touch);
+      el.removeEventListener('mousedown', down);
+      el.removeEventListener('scroll', onScroll);
+    };
+  });
+
+  /** Программная прокрутка не должна считаться ручной. */
+  function onScroll(): void {
+    if (programmaticScroll) return;
+    // Скролл без нашего участия = пользователь листает
+    markUserTouch();
+  }
+
+  // --- долгое нажатие ---
 
   let pressTimer: ReturnType<typeof setTimeout> | null = null;
   let pressedWord: number | null = null;
+  /** Слово, на котором мигнула вспышка. */
+  let flashWord: number | null = $state(null);
 
   function onPointerDown(e: PointerEvent, word: number): void {
-    // Реагируем только на основную кнопку
     if (e.button !== 0) return;
+    markUserTouch();
     pressedWord = word;
+
     pressTimer = setTimeout(() => {
       if (pressedWord !== null && onSeekWord) {
         onSeekWord(pressedWord);
-        // Тактильная отдача, если поддерживается
+        flashWord = pressedWord;
+        setTimeout(() => {
+          if (flashWord === pressedWord) flashWord = null;
+        }, 400);
         navigator.vibrate?.(15);
       }
       pressTimer = null;
       pressedWord = null;
-    }, 450);
+    }, LONG_PRESS_MS);
   }
 
   function cancelPress(): void {
@@ -149,25 +254,19 @@
     pressedWord = null;
   }
 
-  /** Двойной клик — тоже перескок (удобно на десктопе). */
-  function onDoubleClick(word: number): void {
-    onSeekWord?.(word);
-  }
-
-  onMount(() => {
-    return () => cancelPress();
+  onDestroy(() => {
+    cancelPress();
   });
-
-  onDestroy(() => cancelPress());
 </script>
 
 <div
   class="reader"
   bind:this={scrollEl}
-  onscroll={handleUserScroll}
+  onwheel={onWheel}
   style:--font-size="{fontSp}px"
   style:--line-height={lineSpacing}
   style:--font-family={serif ? 'var(--font-serif)' : 'var(--font-sans)'}
+  style:--pill-alpha={locked ? 1 : 0.45}
 >
   {#if !doc}
     <div class="placeholder">Текст не загружен</div>
@@ -180,12 +279,12 @@
           class="word"
           class:read={i < cursorIndex}
           class:cursor={i === cursorIndex}
+          class:flash={flashWord === w.word}
           bind:this={wordEls[i]}
           onpointerdown={(e) => onPointerDown(e, w.word)}
           onpointerup={cancelPress}
           onpointerleave={cancelPress}
           onpointercancel={cancelPress}
-          ondblclick={() => onDoubleClick(w.word)}
           role="button"
           tabindex="-1"
           >{w.text}</span
@@ -199,8 +298,7 @@
   .reader {
     height: 100%;
     overflow-y: auto;
-    padding: 20px 24px 40vh;
-    scroll-behavior: smooth;
+    padding: 16px 20px 220px;
     -webkit-overflow-scrolling: touch;
   }
 
@@ -211,9 +309,8 @@
     font-size: var(--font-size);
     line-height: var(--line-height);
     color: var(--text-main);
-    /* Перенос по словам, без разрыва внутри слова */
     overflow-wrap: break-word;
-    hyphens: auto;
+    hyphens: none;
   }
 
   .word {
@@ -222,21 +319,39 @@
     user-select: none;
     -webkit-user-select: none;
     -webkit-tap-highlight-color: transparent;
-    transition: color var(--transition), background var(--transition);
     border-radius: 3px;
+    transition: color 150ms ease, background-color 150ms ease;
   }
 
-  /* Уже прочитанное — приглушено */
+  /* Уже прочитанное — приглушено (аналог readSpan) */
   .word.read {
     color: var(--read);
   }
 
-  /* Текущее слово — «pill» */
+  /* Текущее слово — плашка. Alpha зависит от locked, как pill.paint.alpha */
   .word.cursor {
     background: var(--pill-bg);
     color: var(--hl-text);
+    opacity: var(--pill-alpha);
     padding: 0 2px;
     margin: 0 -2px;
+    transition: color 150ms ease, background-color 150ms ease, opacity 200ms ease;
+  }
+
+  /* Вспышка при перескоке */
+  .word.flash {
+    background: var(--accent);
+    color: var(--on-accent);
+    animation: flash-pulse 400ms ease-out;
+  }
+
+  @keyframes flash-pulse {
+    0% {
+      background: var(--accent);
+    }
+    100% {
+      background: transparent;
+    }
   }
 
   .placeholder {
