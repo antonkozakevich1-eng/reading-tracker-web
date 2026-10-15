@@ -49,6 +49,13 @@
   /** Длительность долгого нажатия. */
   const LONG_PRESS_MS = 500;
 
+  /**
+   * Максимальная дистанция для плавной прокрутки.
+   * Дальше — мгновенный переход: анимация на тысячи пикселей
+   * воспринимается как зависание.
+   */
+  const SMOOTH_SCROLL_MAX_PX = 1500;
+
   let scrollEl: HTMLDivElement | undefined = $state();
 
   /** Время последнего касания пользователем — пока не прошло 4 с, автопрокрутка молчит. */
@@ -67,15 +74,34 @@
   /**
    * Слова секции с абсолютными индексами.
    * Нужны, чтобы подсветка знала границы и могла сопоставить позицию.
+   *
+   * Номера строк считаются ЗА ОДИН проход по секции, а не поиском
+   * по всему тексту для каждого слова: при 4600 словах и тексте
+   * в 650 000 символов посимвольный поиск давал секунды задержки.
    */
   const sectionWords = $derived.by(() => {
     if (!doc || !section) return [];
+    const text = doc.text;
     const out: { word: number; text: string; line: number }[] = [];
+
+    // Начальный номер строки — по одному поиску на всю секцию
+    let line = lineOf(text, doc.wordStart[section.firstWord] ?? section.start);
+    let scanFrom = doc.wordStart[section.firstWord] ?? section.start;
+
     for (let i = section.firstWord; i < section.endWord && i < doc.size; i++) {
+      const start = doc.wordStart[i]!;
+      const end = doc.wordEnd[i]!;
+
+      // Дочитываем переводы строк только на новом отрезке
+      for (let p = scanFrom; p < start; p++) {
+        if (text.charCodeAt(p) === 10) line++;
+      }
+      scanFrom = Math.max(scanFrom, start);
+
       out.push({
         word: i,
-        text: doc.text.slice(doc.wordStart[i]!, doc.wordEnd[i]!),
-        line: lineOf(doc.text, doc.wordStart[i]!)
+        text: text.slice(start, end),
+        line
       });
     }
     return out;
@@ -101,13 +127,36 @@
     return out;
   });
 
-  /** Номер строки, в которой начинается смещение offset. */
-  function lineOf(text: string, offset: number): number {
-    let n = 0;
-    for (let i = 0; i < offset && i < text.length; i++) {
-      if (text.charCodeAt(i) === 10) n++;
+  /**
+   * Номера строк по смещениям — считаются один раз на документ.
+   * Раньше номер строки искался посимвольным проходом от начала текста
+   * для каждого слова секции: 4600 слов × 650 000 символов давали
+   * секундные задержки при переключении песни.
+   */
+  let lineStarts: number[] = [];
+  let lineStartsFor: string | null = null;
+
+  function ensureLineStarts(text: string): void {
+    if (lineStartsFor === text) return;
+    const starts: number[] = [0];
+    for (let i = 0; i < text.length; i++) {
+      if (text.charCodeAt(i) === 10) starts.push(i + 1);
     }
-    return n;
+    lineStarts = starts;
+    lineStartsFor = text;
+  }
+
+  /** Номер строки для смещения — бинарный поиск по кешу. */
+  function lineOf(text: string, offset: number): number {
+    ensureLineStarts(text);
+    let lo = 0;
+    let hi = lineStarts.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >>> 1;
+      if (lineStarts[mid]! <= offset) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
   }
 
   /** Индекс текущего слова внутри sectionWords. */
@@ -165,12 +214,21 @@
     if (force || top < y + h * 0.12 || bottom > y + h * 0.62) {
       const dest = Math.max(0, Math.trunc(top - h * 0.3));
 
+      /*
+       * Плавная прокрутка только на короткую дистанцию.
+       * Safari/Chrome анимируют smooth с постоянной скоростью: прыжок
+       * на десятки тысяч пикселей (переключение песни, поиск) едет
+       * секундами и выглядит как зависание. Дальние переходы — мгновенно.
+       */
+      const distance = Math.abs(dest - y);
+      const instant = force || distance > SMOOTH_SCROLL_MAX_PX;
+
       // Помечаем прокрутку как нашу: событие scroll не должно
       // обнулять таймер пользовательского касания
       programmaticScroll = true;
-      el.scrollTo({ top: dest, behavior: force ? 'auto' : 'smooth' });
+      el.scrollTo({ top: dest, behavior: instant ? 'auto' : 'smooth' });
 
-      if (force) {
+      if (instant) {
         requestAnimationFrame(() => {
           programmaticScroll = false;
         });
