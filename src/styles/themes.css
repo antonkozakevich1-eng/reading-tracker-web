@@ -1,6 +1,18 @@
 /*
  * Темы приложения. Переключаются атрибутом data-theme на <html>.
- * ID тем соответствуют оригинала: 0 system, 1 light, 2 sepia, 3 dark, 4 black.
+ *
+ * Цвета перенесены 1:1 из android res/values/colors.xml и themes.xml.
+ * Имена переменных соответствуют атрибутам тем оригинала:
+ *   appBg -> --bg            textMain   -> --text-main
+ *   textDim -> --text-dim    textSubtle -> --text-subtle
+ *   hlBg -> --hl-bg          hlText     -> --hl-text
+ *   markerColor -> --marker  headingColor -> --heading
+ *   panelBg -> --bg-panel    accentColor -> --accent
+ *   onAccent -> --on-accent  strokeColor -> --stroke
+ *   goodColor -> --good      warnColor  -> --warn      badColor -> --bad
+ *
+ * Тема "black" в оригинале наследует hlBg/hlText/marker/heading/accent
+ * от тёмной — это сохранено ниже.
  */
 
 :root {
@@ -12,118 +24,146 @@
   --radius-sm: 6px;
   --gap: 12px;
   --header-h: 56px;
-  --footer-h: 72px;
   --transition: 160ms ease;
 }
 
-/* --- Тёмная (по умолчанию, как Theme.App.Dark в оригинале) --- */
-html[data-theme='dark'] {
-  --bg: #121212;
-  --bg-panel: #1c1c1e;
-  --bg-elevated: #26262a;
-  --text-main: #e6e6e6;
-  --text-dim: #9a9a9a;
-  --text-muted: #6b6b6b;
-  --stroke: #333338;
-  --accent: #4a9eff;
-  --on-accent: #0b1a2b;
-  --good: #3ecf8e;
-  --warn: #ffb74d;
-  --bad: #ff6b6b;
-  --hl-bg: #2a3a52;
-  --hl-text: #ffffff;
-  --heading: #c9a227;
-  --read: #7f7f7f;
-  --pill-bg: #4a9eff;
-  --scrim: rgba(0, 0, 0, 0.6);
+/*
+ * Производные переменные, которых нет в оригинале напрямую:
+ *   --bg-elevated — приподнятая поверхность (панели, кнопки);
+ *   --text-muted  — самый тихий текст (подписи).
+ * Они ссылаются на цвета темы, поэтому переключаются вместе с ней.
+ */
+html {
+  --bg-elevated: var(--bg-panel);
+  --text-muted: var(--text-subtle);
 }
 
-/* --- Чёрная (AMOLED) --- */
-html[data-theme='black'] {
-  --bg: #000000;
-  --bg-panel: #0a0a0a;
-  --bg-elevated: #141414;
-  --text-main: #e0e0e0;
-  --text-dim: #8f8f8f;
-  --text-muted: #5c5c5c;
-  --stroke: #242424;
-  --accent: #4a9eff;
-  --on-accent: #04121f;
-  --good: #3ecf8e;
-  --warn: #ffb74d;
-  --bad: #ff6b6b;
-  --hl-bg: #10233c;
-  --hl-text: #ffffff;
-  --heading: #c9a227;
-  --read: #6f6f6f;
-  --pill-bg: #4a9eff;
-  --scrim: rgba(0, 0, 0, 0.75);
-}
-
-/* --- Светлая («бумага») --- */
+/* --- Бумага (light) --- */
 html[data-theme='light'] {
-  --bg: #fbfbf8;
-  --bg-panel: #ffffff;
-  --bg-elevated: #f2f2ee;
-  --text-main: #1a1a1a;
-  --text-dim: #5f5f5f;
-  --text-muted: #8a8a8a;
-  --stroke: #dcdcd6;
-  --accent: #1565c0;
+  --bg: #fbf8f1;
+  --text-main: #1f1d1a;
+  --text-dim: #b5aea3;
+  --text-subtle: #6f6a62;
+  --hl-bg: #ffd54f;
+  --hl-text: #1a1200;
+  --marker: #a39c90;
+  --heading: #7a4b2a;
+  --bg-panel: #f0eadd;
+  --accent: #3d5afe;
   --on-accent: #ffffff;
-  --good: #1b8a5a;
+  --stroke: #d9d2c3;
+  --good: #2e7d32;
   --warn: #b26a00;
   --bad: #c62828;
-  --hl-bg: #cfe4ff;
-  --hl-text: #0d1b2a;
-  --heading: #8a6d00;
-  --read: #a8a8a8;
-  --pill-bg: #1565c0;
+
+  /* Производные для читалки: приглушённое прочитанное = textDim,
+     плашка = hlBg, текст плашки = hlText (как readSpan/pillTextSpan) */
+  --read: var(--text-dim);
+  --pill-bg: var(--hl-bg);
+  --pill-fg: var(--hl-text);
+  --gutter: var(--marker);
   --scrim: rgba(0, 0, 0, 0.35);
 }
 
 /* --- Сепия --- */
 html[data-theme='sepia'] {
   --bg: #f4ecd8;
-  --bg-panel: #fbf5e6;
-  --bg-elevated: #ece2c9;
-  --text-main: #3b3122;
-  --text-dim: #6b5d47;
-  --text-muted: #93856d;
-  --stroke: #ddcfb0;
-  --accent: #9c6b1e;
-  --on-accent: #fffaf0;
-  --good: #4f7a3a;
-  --warn: #a86a12;
-  --bad: #a33a2a;
-  --hl-bg: #e8d3a0;
-  --hl-text: #2e2517;
-  --heading: #8a5a12;
-  --read: #b3a78e;
-  --pill-bg: #9c6b1e;
+  --text-main: #3b2f20;
+  --text-dim: #b8a98a;
+  --text-subtle: #7a6a50;
+  --hl-bg: #ffc857;
+  --hl-text: #2a1b00;
+  --marker: #a8997b;
+  --heading: #8a4b1e;
+  --bg-panel: #e9dec3;
+  --accent: #8a5a2b;
+  --on-accent: #ffffff;
+  --stroke: #d3c4a2;
+  /* good/warn/bad в оригинале берутся от светлой темы */
+  --good: #2e7d32;
+  --warn: #b26a00;
+  --bad: #c62828;
+
+  --read: var(--text-dim);
+  --pill-bg: var(--hl-bg);
+  --pill-fg: var(--hl-text);
+  --gutter: var(--marker);
   --scrim: rgba(60, 45, 25, 0.35);
 }
 
-/* --- Системная: наследует тёмную/светлую по prefers-color-scheme --- */
+/* --- Тёмная --- */
+html[data-theme='dark'] {
+  --bg: #121212;
+  --text-main: #e7e2d9;
+  --text-dim: #5e5b57;
+  --text-subtle: #9c9890;
+  --hl-bg: #ffb300;
+  --hl-text: #000000;
+  --marker: #6b6862;
+  --heading: #d7b98e;
+  --bg-panel: #1e1e1f;
+  --accent: #8ca2ff;
+  --on-accent: #0b1020;
+  --stroke: #2e2e30;
+  --good: #7bd88f;
+  --warn: #ffc247;
+  --bad: #ff8a80;
+
+  --read: var(--text-dim);
+  --pill-bg: var(--hl-bg);
+  --pill-fg: var(--hl-text);
+  --gutter: var(--marker);
+  --scrim: rgba(0, 0, 0, 0.6);
+}
+
+/* --- Чёрная (AMOLED). Наследует подсветку и акцент от тёмной --- */
+html[data-theme='black'] {
+  --bg: #000000;
+  --text-main: #dedad2;
+  --text-dim: #55524e;
+  --text-subtle: #8e8a83;
+  --hl-bg: #ffb300;
+  --hl-text: #000000;
+  --marker: #6b6862;
+  --heading: #d7b98e;
+  --bg-panel: #0f0f10;
+  --accent: #8ca2ff;
+  --on-accent: #0b1020;
+  --stroke: #232325;
+  --good: #7bd88f;
+  --warn: #ffc247;
+  --bad: #ff8a80;
+
+  --read: var(--text-dim);
+  --pill-bg: var(--hl-bg);
+  --pill-fg: var(--hl-text);
+  --gutter: var(--marker);
+  --scrim: rgba(0, 0, 0, 0.75);
+}
+
+/* --- Системная: берёт светлую или тёмную по prefers-color-scheme --- */
 @media (prefers-color-scheme: light) {
   html[data-theme='system'] {
-    --bg: #fbfbf8;
-    --bg-panel: #ffffff;
-    --bg-elevated: #f2f2ee;
-    --text-main: #1a1a1a;
-    --text-dim: #5f5f5f;
-    --text-muted: #8a8a8a;
-    --stroke: #dcdcd6;
-    --accent: #1565c0;
+    --bg: #fbf8f1;
+    --text-main: #1f1d1a;
+    --text-dim: #b5aea3;
+    --text-subtle: #6f6a62;
+    --hl-bg: #ffd54f;
+    --hl-text: #1a1200;
+    --marker: #a39c90;
+    --heading: #7a4b2a;
+    --bg-panel: #f0eadd;
+    --accent: #3d5afe;
     --on-accent: #ffffff;
-    --good: #1b8a5a;
+    --stroke: #d9d2c3;
+    --good: #2e7d32;
     --warn: #b26a00;
     --bad: #c62828;
-    --hl-bg: #cfe4ff;
-    --hl-text: #0d1b2a;
-    --heading: #8a6d00;
-    --read: #a8a8a8;
-    --pill-bg: #1565c0;
+
+    --read: var(--text-dim);
+    --pill-bg: var(--hl-bg);
+    --pill-fg: var(--hl-text);
+    --gutter: var(--marker);
     --scrim: rgba(0, 0, 0, 0.35);
   }
 }
@@ -131,22 +171,25 @@ html[data-theme='sepia'] {
 @media (prefers-color-scheme: dark) {
   html[data-theme='system'] {
     --bg: #121212;
-    --bg-panel: #1c1c1e;
-    --bg-elevated: #26262a;
-    --text-main: #e6e6e6;
-    --text-dim: #9a9a9a;
-    --text-muted: #6b6b6b;
-    --stroke: #333338;
-    --accent: #4a9eff;
-    --on-accent: #0b1a2b;
-    --good: #3ecf8e;
-    --warn: #ffb74d;
-    --bad: #ff6b6b;
-    --hl-bg: #2a3a52;
-    --hl-text: #ffffff;
-    --heading: #c9a227;
-    --read: #7f7f7f;
-    --pill-bg: #4a9eff;
+    --text-main: #e7e2d9;
+    --text-dim: #5e5b57;
+    --text-subtle: #9c9890;
+    --hl-bg: #ffb300;
+    --hl-text: #000000;
+    --marker: #6b6862;
+    --heading: #d7b98e;
+    --bg-panel: #1e1e1f;
+    --accent: #8ca2ff;
+    --on-accent: #0b1020;
+    --stroke: #2e2e30;
+    --good: #7bd88f;
+    --warn: #ffc247;
+    --bad: #ff8a80;
+
+    --read: var(--text-dim);
+    --pill-bg: var(--hl-bg);
+    --pill-fg: var(--hl-text);
+    --gutter: var(--marker);
     --scrim: rgba(0, 0, 0, 0.6);
   }
 }

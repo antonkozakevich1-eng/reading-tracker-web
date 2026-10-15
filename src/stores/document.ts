@@ -213,3 +213,56 @@ export async function forgetCustomText(key: string): Promise<void> {
   await idbDelete(STORE_DOCS, key);
   await idbDelete(STORE_POSITIONS, key);
 }
+
+// --- throttled-сохранение позиции ---
+
+/** Не чаще одного раза в 500 мс — как задумано для частых move. */
+const POSITION_THROTTLE_MS = 500;
+
+let pendingPosition: number | null = null;
+let pendingKey: string | null = null;
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Сохраняет позицию с ограничением частоты.
+ * Вызывается на каждое продвижение трекера, пишет в IndexedDB
+ * не чаще POSITION_THROTTLE_MS.
+ */
+export function savePositionThrottled(docKey: string, position: number): void {
+  pendingKey = docKey;
+  pendingPosition = position;
+
+  if (flushTimer !== null) return;
+
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    void flushPosition();
+  }, POSITION_THROTTLE_MS);
+}
+
+/** Немедленно записывает отложенную позицию (перед закрытием вкладки). */
+export async function flushPosition(): Promise<void> {
+  if (flushTimer !== null) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+
+  const key = pendingKey;
+  const pos = pendingPosition;
+  pendingKey = null;
+  pendingPosition = null;
+
+  if (key !== null && pos !== null) {
+    await persistPosition(key, pos);
+  }
+}
+
+// Сохраняем позицию при уходе со страницы — иначе потеряется последний move
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => {
+    void flushPosition();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') void flushPosition();
+  });
+}
