@@ -5,8 +5,10 @@
    */
   import '../src/styles/global.css';
   import Reader from './components/Reader.svelte';
+  import SpeechProbe from './components/SpeechProbe.svelte';
   import { documentStore, loadBuiltin, setDocument, persistCustomText } from './stores/document';
   import { loadFile } from './lib/io/TextLoader';
+  import { settings } from './stores/settings';
 
   let fileInput: HTMLInputElement | undefined = $state();
 
@@ -90,13 +92,7 @@
   </main>
 
   <footer class="footer">
-    <div class="footer-info">
-      {#if view.doc}
-        <span>{view.doc.size.toLocaleString('ru-RU')} слов</span>
-        <span class="dim">·</span>
-        <span>{view.doc.sections.length} секций</span>
-      {/if}
-    </div>
+    <SpeechProbe sensitivity={$settings.sensitivity} />
   </footer>
 
   <input
@@ -111,7 +107,7 @@
 <style>
   .app {
     display: grid;
-    grid-template-rows: var(--header-h) 1fr var(--footer-h);
+    grid-template-rows: var(--header-h) 1fr auto;
     height: 100%;
   }
 
@@ -155,22 +151,9 @@
   }
 
   .footer {
-    display: flex;
-    align-items: center;
-    justify-content: center;
     border-top: 1px solid var(--stroke);
     background: var(--bg-panel);
     font-size: 13px;
     color: var(--text-dim);
-  }
-
-  .footer-info {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .dim {
-    opacity: 0.5;
   }
 </style>
