@@ -25,6 +25,9 @@ const PROMPTS_FILE = join(__dirname, 'image-prompts.json');
 const OUT_DIR = join(ROOT, 'public', 'images');
 const API_URL = 'https://api.openai.com/v1/images/generations';
 
+/** gpt-image-1 принимает только эти размеры. */
+const ALLOWED_SIZES = new Set(['1024x1024', '1024x1536', '1536x1024', 'auto']);
+
 /** Разбирает аргументы командной строки. */
 function parseArgs(argv) {
   const flags = { force: false, dryRun: false, only: [] };
@@ -123,6 +126,17 @@ async function main() {
 
   console.log(`Промтов: ${images.length}`);
   console.log(`Куда:    public/images/\n`);
+
+  // Проверяем размеры заранее — до запросов и трат
+  const badSizes = images.filter((img) => !ALLOWED_SIZES.has(img.size));
+  if (badSizes.length > 0) {
+    console.error('Недопустимые размеры в image-prompts.json:\n');
+    for (const img of badSizes) {
+      console.error(`  ${img.name}: ${img.size}`);
+    }
+    console.error(`\ngpt-image-1 поддерживает: ${[...ALLOWED_SIZES].join(', ')}`);
+    process.exit(1);
+  }
 
   // Проверяем ключ заранее — до любых запросов
   const apiKey = process.env.OPENAI_API_KEY;

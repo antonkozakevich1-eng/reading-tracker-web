@@ -14,8 +14,8 @@
     },
     {
       "name": "toc-ornament",
-      "prompt": "Greek meander ornament pattern, seamless horizontal band, bronze on parchment background, minimal, no text",
-      "size": "1536x512",
+      "prompt": "Greek meander ornament pattern, seamless horizontal band, bronze on parchment background, minimal, no text. Wide horizontal strip composition, pattern runs along the full width",
+      "size": "1536x1024",
       "model": "gpt-image-1"
     },
     {

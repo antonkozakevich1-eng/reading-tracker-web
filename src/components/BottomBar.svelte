@@ -6,8 +6,10 @@
    * с пульсацией при записи. Справа: переключатель темы и чувствительность.
    * Снизу — мини-индикатор статистики.
    */
+  import { get } from 'svelte/store';
   import { MIN_FONT, MAX_FONT, THEME_LABELS, nextTheme } from '../lib/settings';
   import { settings, updateSettings } from '../stores/settings';
+  import Image from './Image.svelte';
 
   interface Props {
     listening?: boolean;
@@ -35,37 +37,44 @@
   let showSens = $state(false);
 
   /** Длительное нажатие на A−/A+ меняет шрифт плавно. */
-  let holdTimer: ReturnType<typeof setInterval> | null = null;
+  let holdTimeout: ReturnType<typeof setTimeout> | null = null;
+  let holdInterval: ReturnType<typeof setInterval> | null = null;
 
   function changeFont(delta: number): void {
-    updateSettings({ fontSp: s.fontSp + delta });
+    // Читаем актуальное значение прямо из store: `s` — это $derived,
+    // и в замыкании обработчика оно может быть устаревшим
+    const cur = get(settings).fontSp;
+    updateSettings({ fontSp: cur + delta });
   }
 
   function startHold(delta: number): void {
     stopHold();
     // Небольшая задержка перед автоповтором, как в нативных степперах
     const startDelay = setTimeout(() => {
-      holdTimer = setInterval(() => {
-        const cur = $settings.fontSp;
+      holdInterval = setInterval(() => {
+        const cur = get(settings).fontSp;
         if (delta > 0 && cur >= MAX_FONT) return stopHold();
         if (delta < 0 && cur <= MIN_FONT) return stopHold();
         updateSettings({ fontSp: cur + delta });
       }, 80);
     }, 400);
 
-    holdTimer = startDelay as unknown as ReturnType<typeof setInterval>;
+    holdTimeout = startDelay;
   }
 
   function stopHold(): void {
-    if (holdTimer !== null) {
-      clearTimeout(holdTimer as unknown as ReturnType<typeof setTimeout>);
-      clearInterval(holdTimer as unknown as ReturnType<typeof setInterval>);
-      holdTimer = null;
+    if (holdTimeout !== null) {
+      clearTimeout(holdTimeout);
+      holdTimeout = null;
+    }
+    if (holdInterval !== null) {
+      clearInterval(holdInterval);
+      holdInterval = null;
     }
   }
 
   function cycleTheme(): void {
-    updateSettings({ theme: nextTheme(s.theme) });
+    updateSettings({ theme: nextTheme(get(settings).theme) });
   }
 
   /** При записи кольцо показывает уровень сигнала. */
@@ -76,13 +85,16 @@
 
   /** Иконка темы: солнце для светлых, луна для тёмных. */
   const darkTheme = $derived(s.theme === 3 || s.theme === 4);
+  /** Клик вне поповера закрывает его. */
+  function onWindowClick(e: MouseEvent): void {
+    if (!showSens) return;
+    const t = e.target as HTMLElement | null;
+    if (t && (t.closest('.sens-popover') || t.closest('.sens-btn'))) return;
+    showSens = false;
+  }
 </script>
 
-<svelte:window onclick={(e) => {
-  // Закрываем поповер по клику вне его
-  const t = e.target as HTMLElement;
-  if (showSens && !t.closest('.sens-popover') && !t.closest('.sens-btn')) showSens = false;
-}} />
+<svelte:window onclick={onWindowClick} />
 
 <footer class="bar">
   <!-- A− -->
@@ -102,6 +114,8 @@
   <!-- Микрофон -->
   <div class="mic-wrap">
     {#if listening}
+      <!-- Сгенерированная иллюстрация волн — вращается медленно -->
+      <Image name="mic-listening" class="waves" />
       <span class="pulse" aria-hidden="true"></span>
     {/if}
 
@@ -344,6 +358,35 @@
     opacity: 0.18;
     animation: pulse 2s ease-out infinite;
     pointer-events: none;
+  }
+
+  /* Иллюстрация волн вокруг микрофона во время записи */
+  .mic-wrap :global(.waves) {
+    position: absolute;
+    width: 132px;
+    height: 132px;
+    object-fit: contain;
+    opacity: 0.35;
+    mix-blend-mode: screen;
+    pointer-events: none;
+    animation: waves-spin 12s linear infinite;
+  }
+
+  @keyframes waves-spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* На светлых темах screen-блендинг даст белое пятно — используем multiply */
+  :global(html[data-theme='light']) .mic-wrap :global(.waves),
+  :global(html[data-theme='sepia']) .mic-wrap :global(.waves),
+  :global(html[data-theme='system']) .mic-wrap :global(.waves) {
+    mix-blend-mode: multiply;
+    opacity: 0.22;
   }
 
   @keyframes pulse {

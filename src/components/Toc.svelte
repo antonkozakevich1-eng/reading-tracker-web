@@ -220,20 +220,22 @@
     }
   }
 
-  /* Декоративная полоска: картинка, если сгенерирована, иначе тонкая линия */
+  /* Декоративная полоска: лента меандра, если сгенерирована */
   .ornament {
-    height: 16px;
-    margin: 10px 16px 4px;
+    height: 18px;
+    margin: 10px 16px 6px;
     display: flex;
     align-items: center;
+    justify-content: center;
     overflow: hidden;
-    border-radius: 4px;
+    border-radius: 3px;
   }
 
   .ornament :global(.ornament-img) {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    object-position: center;
     opacity: 0.9;
   }
 

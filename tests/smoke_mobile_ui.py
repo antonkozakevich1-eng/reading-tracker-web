@@ -36,6 +36,15 @@ def main() -> int:
         page.goto(BASE, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_timeout(4500)
 
+        # Сбрасываем настройки: тест не должен зависеть от прошлых прогонов
+        page.evaluate(
+            """async () => {
+                const s = await import('/src/stores/settings.ts');
+                s.resetSettings();
+            }"""
+        )
+        page.wait_for_timeout(400)
+
         # ---------- 1. Раскладка ----------
         print("=== 1. раскладка на iPhone ===")
         layout = page.evaluate(
@@ -143,8 +152,16 @@ def main() -> int:
             failures.append("поповер чувствительности не открылся")
 
         if popover:
-            page.locator(".sens-popover input").fill("75")
-            page.wait_for_timeout(250)
+            # Playwright fill() не шлёт input-событие для range, поэтому
+            # меняем значение как это делает браузер при перетаскивании
+            page.evaluate(
+                """() => {
+                    const r = document.querySelector('.sens-popover input[type=range]');
+                    r.value = '75';
+                    r.dispatchEvent(new Event('input', { bubbles: true }));
+                }"""
+            )
+            page.wait_for_timeout(300)
             sens = page.evaluate(
                 """async () => (await import('/src/stores/settings.ts')).currentSettings().sensitivity"""
             )
