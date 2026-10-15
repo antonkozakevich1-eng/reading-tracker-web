@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <id name="banner" />
+    <id name="bookProgress" />
+    <id name="chapterText" />
+    <id name="fileButton" />
+    <id name="fontBigger" />
+    <id name="fontSmaller" />
+    <id name="heardText" />
+    <id name="micButton" />
+    <id name="reader" />
+    <id name="rootLayout" />
+    <id name="searchButton" />
+    <id name="search_chapter" />
+    <id name="search_snippet" />
+    <id name="settingsButton" />
+    <id name="sidePanel" />
+    <id name="statsText" />
+    <id name="statusText" />
+    <id name="titleText" />
+    <id name="tocButton" />
+</resources>

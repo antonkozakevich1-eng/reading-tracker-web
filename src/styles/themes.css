@@ -1,0 +1,152 @@
+/*
+ * Темы приложения. Переключаются атрибутом data-theme на <html>.
+ * ID тем соответствуют оригинала: 0 system, 1 light, 2 sepia, 3 dark, 4 black.
+ */
+
+:root {
+  /* Системные шрифты: без CDN */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: Georgia, 'Times New Roman', 'Nimbus Roman', serif;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --gap: 12px;
+  --header-h: 56px;
+  --footer-h: 72px;
+  --transition: 160ms ease;
+}
+
+/* --- Тёмная (по умолчанию, как Theme.App.Dark в оригинале) --- */
+html[data-theme='dark'] {
+  --bg: #121212;
+  --bg-panel: #1c1c1e;
+  --bg-elevated: #26262a;
+  --text-main: #e6e6e6;
+  --text-dim: #9a9a9a;
+  --text-muted: #6b6b6b;
+  --stroke: #333338;
+  --accent: #4a9eff;
+  --on-accent: #0b1a2b;
+  --good: #3ecf8e;
+  --warn: #ffb74d;
+  --bad: #ff6b6b;
+  --hl-bg: #2a3a52;
+  --hl-text: #ffffff;
+  --heading: #c9a227;
+  --read: #7f7f7f;
+  --pill-bg: #4a9eff;
+  --scrim: rgba(0, 0, 0, 0.6);
+}
+
+/* --- Чёрная (AMOLED) --- */
+html[data-theme='black'] {
+  --bg: #000000;
+  --bg-panel: #0a0a0a;
+  --bg-elevated: #141414;
+  --text-main: #e0e0e0;
+  --text-dim: #8f8f8f;
+  --text-muted: #5c5c5c;
+  --stroke: #242424;
+  --accent: #4a9eff;
+  --on-accent: #04121f;
+  --good: #3ecf8e;
+  --warn: #ffb74d;
+  --bad: #ff6b6b;
+  --hl-bg: #10233c;
+  --hl-text: #ffffff;
+  --heading: #c9a227;
+  --read: #6f6f6f;
+  --pill-bg: #4a9eff;
+  --scrim: rgba(0, 0, 0, 0.75);
+}
+
+/* --- Светлая («бумага») --- */
+html[data-theme='light'] {
+  --bg: #fbfbf8;
+  --bg-panel: #ffffff;
+  --bg-elevated: #f2f2ee;
+  --text-main: #1a1a1a;
+  --text-dim: #5f5f5f;
+  --text-muted: #8a8a8a;
+  --stroke: #dcdcd6;
+  --accent: #1565c0;
+  --on-accent: #ffffff;
+  --good: #1b8a5a;
+  --warn: #b26a00;
+  --bad: #c62828;
+  --hl-bg: #cfe4ff;
+  --hl-text: #0d1b2a;
+  --heading: #8a6d00;
+  --read: #a8a8a8;
+  --pill-bg: #1565c0;
+  --scrim: rgba(0, 0, 0, 0.35);
+}
+
+/* --- Сепия --- */
+html[data-theme='sepia'] {
+  --bg: #f4ecd8;
+  --bg-panel: #fbf5e6;
+  --bg-elevated: #ece2c9;
+  --text-main: #3b3122;
+  --text-dim: #6b5d47;
+  --text-muted: #93856d;
+  --stroke: #ddcfb0;
+  --accent: #9c6b1e;
+  --on-accent: #fffaf0;
+  --good: #4f7a3a;
+  --warn: #a86a12;
+  --bad: #a33a2a;
+  --hl-bg: #e8d3a0;
+  --hl-text: #2e2517;
+  --heading: #8a5a12;
+  --read: #b3a78e;
+  --pill-bg: #9c6b1e;
+  --scrim: rgba(60, 45, 25, 0.35);
+}
+
+/* --- Системная: наследует тёмную/светлую по prefers-color-scheme --- */
+@media (prefers-color-scheme: light) {
+  html[data-theme='system'] {
+    --bg: #fbfbf8;
+    --bg-panel: #ffffff;
+    --bg-elevated: #f2f2ee;
+    --text-main: #1a1a1a;
+    --text-dim: #5f5f5f;
+    --text-muted: #8a8a8a;
+    --stroke: #dcdcd6;
+    --accent: #1565c0;
+    --on-accent: #ffffff;
+    --good: #1b8a5a;
+    --warn: #b26a00;
+    --bad: #c62828;
+    --hl-bg: #cfe4ff;
+    --hl-text: #0d1b2a;
+    --heading: #8a6d00;
+    --read: #a8a8a8;
+    --pill-bg: #1565c0;
+    --scrim: rgba(0, 0, 0, 0.35);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  html[data-theme='system'] {
+    --bg: #121212;
+    --bg-panel: #1c1c1e;
+    --bg-elevated: #26262a;
+    --text-main: #e6e6e6;
+    --text-dim: #9a9a9a;
+    --text-muted: #6b6b6b;
+    --stroke: #333338;
+    --accent: #4a9eff;
+    --on-accent: #0b1a2b;
+    --good: #3ecf8e;
+    --warn: #ffb74d;
+    --bad: #ff6b6b;
+    --hl-bg: #2a3a52;
+    --hl-text: #ffffff;
+    --heading: #c9a227;
+    --read: #7f7f7f;
+    --pill-bg: #4a9eff;
+    --scrim: rgba(0, 0, 0, 0.6);
+  }
+}
