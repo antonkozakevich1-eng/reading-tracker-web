@@ -85,7 +85,22 @@
 
   // --- ссылки на элементы слов для прокрутки ---
 
-  let wordEls: (HTMLElement | undefined)[] = $state([]);
+  /**
+   * Элементы слов. Заполняются через action, а не `bind:this={arr[i]}`:
+   * индексная привязка не уведомляет реактивную систему, из-за чего
+   * эффект прокрутки не перезапускался и автопрокрутка не работала.
+   */
+  const wordEls: (HTMLElement | undefined)[] = [];
+
+  /** Регистрирует элемент слова; возвращает очистку для Svelte. */
+  function wordRef(node: HTMLElement, index: number): { destroy(): void } {
+    wordEls[index] = node;
+    return {
+      destroy() {
+        if (wordEls[index] === node) delete wordEls[index];
+      }
+    };
+  }
 
   /** Программная прокрутка не должна считаться ручной. */
   let programmaticScroll = false;
@@ -109,12 +124,11 @@
       return;
     }
 
-    const elRect = el.getBoundingClientRect();
-    const tRect = target.getBoundingClientRect();
-
-    // Координаты цели относительно содержимого прокрутки
-    const top = tRect.top - elRect.top + el.scrollTop;
-    const bottom = tRect.bottom - elRect.top + el.scrollTop;
+    // Позиция слова относительно содержимого контейнера.
+    // offsetTop не зависит от текущей прокрутки — в отличие от
+    // getBoundingClientRect(), который меняется между кадрами.
+    const top = offsetWithin(target, el);
+    const bottom = top + (target.offsetHeight || 0);
     const y = el.scrollTop;
 
     // force || top < y + h*0.12 || bottom > y + h*0.62
@@ -126,35 +140,57 @@
       programmaticScroll = true;
       el.scrollTo({ top: dest, behavior: force ? 'auto' : 'smooth' });
 
-      const clear = (): void => {
-        programmaticScroll = false;
-      };
       if (force) {
-        requestAnimationFrame(clear);
+        requestAnimationFrame(() => {
+          programmaticScroll = false;
+        });
       } else {
         // Плавная прокрутка идёт ~300 мс
-        setTimeout(clear, 400);
+        setTimeout(() => {
+          programmaticScroll = false;
+        }, 400);
       }
     }
   }
 
+  /** Смещение элемента относительно содержимого контейнера прокрутки. */
+  function offsetWithin(node: HTMLElement, container: HTMLElement): number {
+    let top = 0;
+    let cur: HTMLElement | null = node;
+    while (cur && cur !== container) {
+      top += cur.offsetTop;
+      cur = cur.offsetParent as HTMLElement | null;
+    }
+    return top;
+  }
+
   // --- реакция на смену позиции ---
 
+  /**
+   * Автопрокрутка за курсором.
+   * Зависим от cursorIndex (индекс внутри секции) и sectionIndex:
+   * при смене позиции эффект перезапускается и прокручивает к слову.
+   */
   $effect(() => {
-    // Зависимости
-    void cursorWord;
+    void cursorIndex;
+    void sectionIndex;
     void autoScroll;
 
-    requestAnimationFrame(() => scrollToCursor(false));
+    // Ждём кадр: элементы слов регистрируются actions'ами при рендере
+    const raf = requestAnimationFrame(() => {
+      scrollToCursor(false);
+    });
+    return () => cancelAnimationFrame(raf);
   });
 
   // Принудительная прокрутка по внешнему сигналу (смена секции, seek, смена шрифта)
   $effect(() => {
-    void sectionIndex;
     void forceScrollToken;
 
-    wordEls = [];
-    requestAnimationFrame(() => requestAnimationFrame(() => scrollToCursor(true)));
+    const raf = requestAnimationFrame(() => {
+      scrollToCursor(true);
+    });
+    return () => cancelAnimationFrame(raf);
   });
 
   // --- отслеживание касаний пользователя ---
@@ -280,7 +316,7 @@
           class:read={i < cursorIndex}
           class:cursor={i === cursorIndex}
           class:flash={flashWord === w.word}
-          bind:this={wordEls[i]}
+          use:wordRef={i}
           onpointerdown={(e) => onPointerDown(e, w.word)}
           onpointerup={cancelPress}
           onpointerleave={cancelPress}
