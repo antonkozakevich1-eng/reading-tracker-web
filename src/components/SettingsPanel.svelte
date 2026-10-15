@@ -1,22 +1,13 @@
 <script lang="ts">
   /**
-   * Панель настроек. Аналог Dialogs.showSettings() из оригинала.
+   * Настройки — только редкое (mobile-first).
    *
-   * Все значения применяются мгновенно: store → атрибуты на <html> и
-   * CSS-переменные в Reader. Диапазоны совпадают с Settings.kt.
+   * Частое вынесено на главный экран: шрифт (A−/A+), тема, чувствительность.
+   * Здесь остаётся: движок, serif, межстрочный интервал, сбросы, файл.
    */
   import {
-    MAX_FONT,
-    MIN_FONT,
     MAX_LINE_SPACING,
     MIN_LINE_SPACING,
-    MAX_SENSITIVITY,
-    MIN_SENSITIVITY,
-    THEME_SYSTEM,
-    THEME_LIGHT,
-    THEME_SEPIA,
-    THEME_DARK,
-    THEME_BLACK,
     ENGINE_NEURAL,
     ENGINE_VOSK
   } from '../lib/settings';
@@ -24,36 +15,18 @@
 
   interface Props {
     onClose?: () => void;
-    /** Сброс статистики (обрабатывается снаружи). */
     onResetStats?: () => void;
-    /** Возврат к встроенной «Одиссее». */
     onRestoreBuiltin?: () => void;
+    onOpenFile?: () => void;
   }
 
-  let { onClose, onResetStats, onRestoreBuiltin }: Props = $props();
+  let { onClose, onResetStats, onRestoreBuiltin, onOpenFile }: Props = $props();
 
   const s = $derived($settings);
 
-  const THEMES = [
-    { id: THEME_SYSTEM, label: 'Система' },
-    { id: THEME_LIGHT, label: 'Бумага' },
-    { id: THEME_SEPIA, label: 'Сепия' },
-    { id: THEME_DARK, label: 'Тёмная' },
-    { id: THEME_BLACK, label: 'Чёрная' }
-  ];
-
-  /** Межстрочный интервал с шагом 0.05. */
   function onLineSpacing(e: Event): void {
     const v = Number((e.target as HTMLInputElement).value);
     updateSettings({ lineSpacing: Math.round(v * 20) / 20 });
-  }
-
-  function onFont(e: Event): void {
-    updateSettings({ fontSp: Number((e.target as HTMLInputElement).value) });
-  }
-
-  function onSensitivity(e: Event): void {
-    updateSettings({ sensitivity: Number((e.target as HTMLInputElement).value) });
   }
 
   function onKeyDown(e: KeyboardEvent): void {
@@ -71,135 +44,111 @@
   onkeydown={(e) => e.key === 'Enter' && onClose?.()}
 >
   <div
-    class="panel"
+    class="sheet"
     role="dialog"
     aria-label="Настройки"
     tabindex="-1"
     onclick={(e) => e.stopPropagation()}
     onkeydown={(e) => e.stopPropagation()}
   >
-    <div class="panel-head">
-      <span>Настройки</span>
-      <button class="close" onclick={onClose} aria-label="Закрыть">✕</button>
-    </div>
+    <div class="grabber" aria-hidden="true"></div>
 
-    <div class="panel-body">
-      <!-- Оформление -->
-      <div class="section-title">Оформление</div>
+    <header class="head">
+      <span class="head-title">Настройки</span>
+      <button class="done" onclick={onClose}>Готово</button>
+    </header>
 
-      <div class="row">
-        <div class="label">Тема</div>
-        <div class="themes">
-          {#each THEMES as t (t.id)}
-            <button
-              class="theme-btn"
-              class:active={s.theme === t.id}
-              onclick={() => updateSettings({ theme: t.id })}
-            >
-              {t.label}
-            </button>
-          {/each}
+    <div class="body">
+      <!-- Текст -->
+      <section class="group">
+        <div class="group-title">Текст</div>
+
+        <label class="row">
+          <span class="row-label">Шрифт с засечками</span>
+          <input
+            class="switch"
+            type="checkbox"
+            checked={s.serif}
+            onchange={(e) => updateSettings({ serif: (e.target as HTMLInputElement).checked })}
+          />
+        </label>
+
+        <div class="row column">
+          <span class="row-label">Межстрочный интервал · {s.lineSpacing.toFixed(2)}</span>
+          <input
+            class="range"
+            type="range"
+            min={MIN_LINE_SPACING}
+            max={MAX_LINE_SPACING}
+            step="0.05"
+            value={s.lineSpacing}
+            oninput={onLineSpacing}
+          />
         </div>
-      </div>
-
-      <div class="row">
-        <div class="label">
-          Размер шрифта: <span class="value">{s.fontSp.toFixed(0)}</span>
-        </div>
-        <input
-          class="range"
-          type="range"
-          min={MIN_FONT}
-          max={MAX_FONT}
-          step="1"
-          value={s.fontSp}
-          oninput={onFont}
-        />
-      </div>
-
-      <div class="row">
-        <div class="label">
-          Межстрочный интервал: <span class="value">{s.lineSpacing.toFixed(2)}</span>
-        </div>
-        <input
-          class="range"
-          type="range"
-          min={MIN_LINE_SPACING}
-          max={MAX_LINE_SPACING}
-          step="0.05"
-          value={s.lineSpacing}
-          oninput={onLineSpacing}
-        />
-      </div>
-
-      <label class="check">
-        <input
-          type="checkbox"
-          checked={s.serif}
-          onchange={(e) => updateSettings({ serif: (e.target as HTMLInputElement).checked })}
-        />
-        <span>Шрифт с засечками</span>
-      </label>
-
-      <label class="check">
-        <input
-          type="checkbox"
-          checked={s.autoScroll}
-          onchange={(e) => updateSettings({ autoScroll: (e.target as HTMLInputElement).checked })}
-        />
-        <span>Прокручивать текст за подсветкой</span>
-      </label>
+      </section>
 
       <!-- Распознавание -->
-      <div class="section-title">Распознавание</div>
+      <section class="group">
+        <div class="group-title">Распознавание</div>
 
-      <div class="row">
-        <div class="label">Движок</div>
-        <select
-          class="select"
-          value={s.engine}
-          onchange={(e) => updateSettings({ engine: Number((e.target as HTMLSelectElement).value) })}
-        >
-          <option value={ENGINE_NEURAL}>Нейросеть (рекомендуется)</option>
-          <option value={ENGINE_VOSK}>Vosk (классический, запасной)</option>
-        </select>
-      </div>
-
-      <div class="row">
-        <div class="label">
-          Чувствительность микрофона: <span class="value">{s.sensitivity}</span>
+        <div class="row column">
+          <span class="row-label">Движок</span>
+          <select
+            class="select"
+            value={s.engine}
+            onchange={(e) => updateSettings({ engine: Number((e.target as HTMLSelectElement).value) })}
+          >
+            <option value={ENGINE_NEURAL}>Нейросеть (рекомендуется)</option>
+            <option value={ENGINE_VOSK}>Vosk (классический, запасной)</option>
+          </select>
         </div>
-        <input
-          class="range"
-          type="range"
-          min={MIN_SENSITIVITY}
-          max={MAX_SENSITIVITY}
-          step="1"
-          value={s.sensitivity}
-          oninput={onSensitivity}
-        />
-        <div class="hint">Выше — лучше слышит тихую речь, но усиливает и шум.</div>
-      </div>
 
-      <label class="check">
-        <input
-          type="checkbox"
-          checked={s.useContext}
-          onchange={(e) => updateSettings({ useContext: (e.target as HTMLInputElement).checked })}
-        />
-        <span>Подсказывать распознавателю слова из текста</span>
-      </label>
+        <label class="row">
+          <span class="row-label">Подсказывать слова из текста</span>
+          <input
+            class="switch"
+            type="checkbox"
+            checked={s.useContext}
+            onchange={(e) => updateSettings({ useContext: (e.target as HTMLInputElement).checked })}
+          />
+        </label>
 
-      <!-- Прочее -->
-      <div class="section-title">Прочее</div>
+        <label class="row">
+          <span class="row-label">Прокручивать за подсветкой</span>
+          <input
+            class="switch"
+            type="checkbox"
+            checked={s.autoScroll}
+            onchange={(e) => updateSettings({ autoScroll: (e.target as HTMLInputElement).checked })}
+          />
+        </label>
+      </section>
 
-      <div class="actions">
-        <button class="btn" onclick={() => onRestoreBuiltin?.()}>
-          Вернуть «Одиссею» (текст по умолчанию)
+      <!-- Текст и файлы -->
+      <section class="group">
+        <div class="group-title">Документ</div>
+
+        <button class="row action" onclick={() => { onOpenFile?.(); onClose?.(); }}>
+          <span class="row-label">Открыть файл (.txt, .html, .mht)</span>
+          <span class="chevron">›</span>
         </button>
-        <button class="btn" onclick={() => onResetStats?.()}>Сбросить статистику</button>
-        <button class="btn" onclick={resetSettings}>Сбросить настройки</button>
-      </div>
+
+        <button class="row action" onclick={() => onRestoreBuiltin?.()}>
+          <span class="row-label">Вернуть «Одиссею»</span>
+          <span class="chevron">›</span>
+        </button>
+      </section>
+
+      <!-- Сбросы -->
+      <section class="group">
+        <button class="row action" onclick={() => onResetStats?.()}>
+          <span class="row-label">Сбросить статистику</span>
+        </button>
+
+        <button class="row action danger" onclick={resetSettings}>
+          <span class="row-label">Сбросить настройки</span>
+        </button>
+      </section>
     </div>
   </div>
 </div>
@@ -210,104 +159,143 @@
     inset: 0;
     background: var(--scrim);
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: center;
-    padding: 20px;
-    z-index: 50;
+    z-index: 55;
     cursor: default;
   }
 
-  .panel {
-    background: var(--bg-panel);
-    border: 1px solid var(--stroke);
-    border-radius: var(--radius);
+  /* Нижний лист — как в iOS */
+  .sheet {
     width: 100%;
-    max-width: 520px;
-    max-height: 85vh;
+    max-width: 560px;
+    max-height: 88vh;
     display: flex;
     flex-direction: column;
+    background: var(--bg-panel);
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+    padding-bottom: env(safe-area-inset-bottom);
+    animation: sheet-up 250ms ease-out;
     overflow: hidden;
   }
 
-  .panel-head {
+  @keyframes sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
+  .grabber {
+    width: 36px;
+    height: 5px;
+    margin: 8px auto 0;
+    border-radius: 3px;
+    background: var(--stroke);
+    flex-shrink: 0;
+  }
+
+  .head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--stroke);
+    padding: 10px 16px 12px;
+    flex-shrink: 0;
+  }
+
+  .head-title {
+    font-size: 17px;
     font-weight: 600;
     color: var(--text-main);
   }
 
-  .close {
-    color: var(--text-subtle);
+  .done {
+    min-height: 44px;
+    padding: 0 4px;
+    color: var(--accent);
     font-size: 16px;
-    line-height: 1;
-    padding: 4px;
+    font-weight: 600;
   }
 
-  .close:hover {
-    color: var(--text-main);
+  .done:active {
+    opacity: 0.5;
   }
 
-  .panel-body {
+  .body {
     overflow-y: auto;
-    padding: 0 0 8px;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 16px 20px;
   }
 
-  .section-title {
+  /* --- Группы --- */
+
+  .group {
+    margin-bottom: 20px;
+  }
+
+  .group-title {
     font-size: 12px;
     font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: none;
-    color: var(--accent);
-    padding: 18px 16px 6px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-subtle);
+    margin-bottom: 8px;
+    padding-left: 4px;
   }
 
   .row {
-    padding: 8px 16px;
-  }
-
-  .label {
-    font-size: 14px;
-    color: var(--text-main);
-    margin-bottom: 8px;
-  }
-
-  .value {
-    color: var(--text-subtle);
-  }
-
-  .hint {
-    font-size: 12px;
-    color: var(--text-subtle);
-    margin-top: 6px;
-  }
-
-  .themes {
     display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .theme-btn {
-    padding: 6px 12px;
-    border: 1px solid var(--stroke);
-    border-radius: var(--radius-sm);
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    min-height: 52px;
+    padding: 12px 14px;
+    margin-bottom: 6px;
+    border-radius: 12px;
     background: var(--bg-elevated);
     color: var(--text-main);
-    font-size: 13px;
-    transition: border-color var(--transition), background var(--transition);
+    text-align: left;
+    transition: transform 250ms ease-out, opacity 250ms ease-out;
   }
 
-  .theme-btn:hover {
-    border-color: var(--accent);
+  .row.column {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
   }
 
-  .theme-btn.active {
-    border-color: var(--accent);
-    background: var(--accent);
-    color: var(--on-accent);
+  .row.action:active {
+    transform: scale(0.985);
+    opacity: 0.8;
+  }
+
+  .row.danger .row-label {
+    color: var(--bad);
+  }
+
+  .row-label {
+    font-size: 15px;
+    line-height: 1.3;
+  }
+
+  .chevron {
+    color: var(--text-subtle);
+    font-size: 20px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  /* --- Контролы --- */
+
+  .switch {
+    width: 50px;
+    height: 30px;
+    flex-shrink: 0;
+    accent-color: var(--accent);
   }
 
   .range {
@@ -317,33 +305,14 @@
 
   .select {
     width: 100%;
-    padding: 8px 10px;
+    min-height: 44px;
+    padding: 10px 12px;
     border: 1px solid var(--stroke);
-    border-radius: var(--radius-sm);
+    border-radius: 10px;
     background: var(--bg);
     color: var(--text-main);
-    font: inherit;
-  }
-
-  .check {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 16px;
-    cursor: pointer;
-    color: var(--text-main);
-  }
-
-  .check input {
-    accent-color: var(--accent);
-    width: 16px;
-    height: 16px;
-  }
-
-  .actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 8px 16px 4px;
+    font-size: 16px;
+    -webkit-appearance: none;
+    appearance: none;
   }
 </style>

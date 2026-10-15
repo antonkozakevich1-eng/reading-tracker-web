@@ -16,9 +16,10 @@
  */
 
 :root {
-  /* Системные шрифты: без CDN */
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-serif: Georgia, 'Times New Roman', 'Nimbus Roman', serif;
+  /* Системные шрифты: интерфейс — SF Pro, текст книги — New York.
+     Без CDN, только то, что есть в системе. */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'New York', ui-serif, Georgia, 'Times New Roman', serif;
 
   --radius: 10px;
   --radius-sm: 6px;

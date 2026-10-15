@@ -55,12 +55,17 @@ export interface Settings {
   customName: string;
 }
 
-/** Дефолты ровно как в Settings.kt. */
+/** Дефолты как в Settings.kt, кроме fontSp и lineSpacing.
+ *
+ * Для мобильного веба (iPhone) 22 sp из Android выглядит слишком крупно
+ * на 390px: в строку влезает 4–5 слов. 18px — комфортный размер для
+ * чтения поэмы на телефоне, при этом границы 14–48 не менялись.
+ */
 export const DEFAULT_SETTINGS: Settings = {
   theme: THEME_DARK,
-  fontSp: 22,
+  fontSp: 18,
   serif: true,
-  lineSpacing: 1.35,
+  lineSpacing: 1.5,
   sensitivity: 60,
   engine: ENGINE_NEURAL,
   useContext: true,
@@ -121,6 +126,27 @@ export const THEME_NAMES: Record<number, string> = {
   [THEME_SEPIA]: 'sepia',
   [THEME_DARK]: 'dark',
   [THEME_BLACK]: 'black'
+};
+
+/**
+ * Порядок переключения тем по кругу — как в требовании:
+ * system → light → sepia → dark → black → system.
+ */
+const THEME_CYCLE = [THEME_SYSTEM, THEME_LIGHT, THEME_SEPIA, THEME_DARK, THEME_BLACK];
+
+/** Следующая тема по кругу. */
+export function nextTheme(current: number): number {
+  const i = THEME_CYCLE.indexOf(current);
+  return THEME_CYCLE[(i + 1) % THEME_CYCLE.length] ?? THEME_DARK;
+}
+
+/** Человекочитаемое имя темы для подписи на кнопке. */
+export const THEME_LABELS: Record<number, string> = {
+  [THEME_SYSTEM]: 'Система',
+  [THEME_LIGHT]: 'Бумага',
+  [THEME_SEPIA]: 'Сепия',
+  [THEME_DARK]: 'Тёмная',
+  [THEME_BLACK]: 'Чёрная'
 };
 
 /** Ключ позиции для документа. */

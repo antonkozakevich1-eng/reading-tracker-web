@@ -70,15 +70,45 @@
    */
   const sectionWords = $derived.by(() => {
     if (!doc || !section) return [];
-    const out: { word: number; text: string }[] = [];
+    const out: { word: number; text: string; line: number }[] = [];
     for (let i = section.firstWord; i < section.endWord && i < doc.size; i++) {
       out.push({
         word: i,
-        text: doc.text.slice(doc.wordStart[i]!, doc.wordEnd[i]!)
+        text: doc.text.slice(doc.wordStart[i]!, doc.wordEnd[i]!),
+        line: lineOf(doc.text, doc.wordStart[i]!)
       });
     }
     return out;
   });
+
+  /**
+   * Разбиение на строки-стихи: в поэме каждый стих с новой строки,
+   * и это нужно сохранить в вёрстке (иначе текст слипается в абзац).
+   * Каждому слову сразу кладём его индекс — чтобы не искать в цикле.
+   */
+  const lines = $derived.by(() => {
+    const out: { line: number; words: { word: number; text: string; index: number }[] }[] = [];
+    let current: (typeof out)[number] | null = null;
+
+    for (let i = 0; i < sectionWords.length; i++) {
+      const w = sectionWords[i]!;
+      if (current === null || w.line !== current.line) {
+        current = { line: w.line, words: [] };
+        out.push(current);
+      }
+      current.words.push({ word: w.word, text: w.text, index: i });
+    }
+    return out;
+  });
+
+  /** Номер строки, в которой начинается смещение offset. */
+  function lineOf(text: string, offset: number): number {
+    let n = 0;
+    for (let i = 0; i < offset && i < text.length; i++) {
+      if (text.charCodeAt(i) === 10) n++;
+    }
+    return n;
+  }
 
   /** Индекс текущего слова внутри sectionWords. */
   const cursorIndex = $derived(sectionWords.findIndex((w) => w.word >= cursorWord));
@@ -309,24 +339,28 @@
   {:else if sectionWords.length === 0}
     <div class="placeholder">В этой секции нет текста</div>
   {:else}
-    <p class="paragraph">
-      {#each sectionWords as w, i (w.word)}
-        <span
-          class="word"
-          class:read={i < cursorIndex}
-          class:cursor={i === cursorIndex}
-          class:flash={flashWord === w.word}
-          use:wordRef={i}
-          onpointerdown={(e) => onPointerDown(e, w.word)}
-          onpointerup={cancelPress}
-          onpointerleave={cancelPress}
-          onpointercancel={cancelPress}
-          role="button"
-          tabindex="-1"
-          >{w.text}</span
-        >{' '}
+    <div class="poem">
+      {#each lines as ln (`${ln.line}`)}
+        <p class="verse">
+          {#each ln.words as w (w.word)}
+            <span
+              class="word"
+              class:read={w.index < cursorIndex}
+              class:cursor={w.index === cursorIndex}
+              class:flash={flashWord === w.word}
+              use:wordRef={w.index}
+              onpointerdown={(e) => onPointerDown(e, w.word)}
+              onpointerup={cancelPress}
+              onpointerleave={cancelPress}
+              onpointercancel={cancelPress}
+              role="button"
+              tabindex="-1"
+              >{w.text}</span
+            >{' '}
+          {/each}
+        </p>
       {/each}
-    </p>
+    </div>
   {/if}
 </div>
 
@@ -334,19 +368,43 @@
   .reader {
     height: 100%;
     overflow-y: auto;
-    padding: 16px 20px 220px;
     -webkit-overflow-scrolling: touch;
+    /* Mobile-first: 14px по бокам — каждый пиксель ширины важен для стиха */
+    padding: 14px 14px 30vh;
+    padding-left: max(14px, env(safe-area-inset-left));
+    padding-right: max(14px, env(safe-area-inset-right));
+    /* Изолируем отрисовку: изменения курсора не задевают остальной UI */
+    contain: layout style paint;
+    /* iOS: вертикальная прокрутка, без горизонтальных жестов */
+    touch-action: pan-y;
+    overscroll-behavior: contain;
   }
 
-  .paragraph {
+  /* На широких экранах — центрированная колонка, комфортная для чтения */
+  @media (min-width: 1024px) {
+    .reader {
+      padding: 24px 32px 40vh;
+    }
+  }
+
+  .poem {
     margin: 0 auto;
-    max-width: 46em;
+    max-width: 34em;
+  }
+
+  /* Стих: каждый с новой строки. Перенос внутри стиха получает
+     висячий отступ, чтобы продолжение не путалось со следующим стихом. */
+  .verse {
+    margin: 0 0 0.35em;
+    padding-left: 1.1em;
+    text-indent: -1.1em;
     font-family: var(--font-family);
     font-size: var(--font-size);
     line-height: var(--line-height);
     color: var(--text-main);
     overflow-wrap: break-word;
     hyphens: none;
+    text-wrap: pretty;
   }
 
   .word {

@@ -12,9 +12,20 @@ yarn-error.log*
 # Кеш Vercel CLI
 .vercel/
 
+# Секреты: ключ OpenAI живёт только в переменной окружения
+.env
+.env.local
+.env.*.local
+
+# Сгенерированные иллюстрации — артефакт, создаётся локально
+public/images/
+
 # Эталон для сверки — не часть веб-проекта
 alicegpt-original/
 
 # Дамп APK и оригинальный APK — артефакты анализа, не исходники
 apktool-out/
 reading-tracker-v2-lite.apk
+
+# Скриншоты для проверки UI — артефакт
+shots/

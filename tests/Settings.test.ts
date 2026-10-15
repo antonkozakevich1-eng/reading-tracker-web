@@ -6,7 +6,6 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  DEFAULT_SETTINGS,
   DOC_ASSET,
   MAX_FONT,
   MIN_FONT,
@@ -23,13 +22,19 @@ describe('SettingsTest', () => {
     const s = normalizeSettings(null);
     expect(s.engine).toBe(ENGINE_NEURAL);
     expect(s.theme).toBe(THEME_DARK);
-    expect(s.fontSp).toBe(22);
+    // ОТЛИЧИЕ ОТ ОРИГИНАЛА (осознанное): в Settings.kt fontSp = 22 sp,
+    // lineSpacing = 1.35. Для мобильного веба (iPhone, 390px) взяты 18px
+    // и 1.5 — иначе в строку влезает 4–5 слов поэмы.
+    expect(s.fontSp).toBe(18);
+    expect(s.lineSpacing).toBe(1.5);
     expect(s.serif && s.useContext && s.autoScroll).toBe(true);
     expect(s.seenIntro).toBe(false);
     expect(s.currentDoc).toBe(DOC_ASSET);
     // position(DOC_ASSET) по умолчанию = 0 — проверяется в document store
-    expect(DEFAULT_SETTINGS.lineSpacing).toBe(1.35);
-    expect(DEFAULT_SETTINGS.sensitivity).toBe(60);
+    expect(s.sensitivity).toBe(60);
+    // Границы и клампы остались как в оригинале
+    expect(MIN_FONT).toBe(14);
+    expect(MAX_FONT).toBe(48);
   });
 
   it('valuesAreRememberedBetweenInstances', () => {
