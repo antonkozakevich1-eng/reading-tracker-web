@@ -9,8 +9,12 @@ npm-debug.log*
 yarn-error.log*
 *.log
 
-# Клон оригинала — только для чтения, не наш код
-alicegpt-original/
-
 # Кеш Vercel CLI
 .vercel/
+
+# Эталон для сверки — не часть веб-проекта
+alicegpt-original/
+
+# Дамп APK и оригинальный APK — артефакты анализа, не исходники
+apktool-out/
+reading-tracker-v2-lite.apk
