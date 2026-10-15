@@ -4,9 +4,6 @@ dist/
 *.local
 .vite/
 
-# Модель речи — крупная, не коммитим
-public/models/
-
 # Логи
 npm-debug.log*
 yarn-error.log*
@@ -14,3 +11,6 @@ yarn-error.log*
 
 # Клон оригинала — только для чтения, не наш код
 alicegpt-original/
+
+# Кеш Vercel CLI
+.vercel/
