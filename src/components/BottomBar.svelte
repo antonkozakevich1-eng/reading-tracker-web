@@ -9,7 +9,6 @@
   import { get } from 'svelte/store';
   import { MIN_FONT, MAX_FONT, THEME_LABELS, nextTheme } from '../lib/settings';
   import { settings, updateSettings } from '../stores/settings';
-  import Image from './Image.svelte';
 
   interface Props {
     listening?: boolean;
@@ -113,12 +112,6 @@
 
   <!-- Микрофон -->
   <div class="mic-wrap">
-    {#if listening}
-      <!-- Сгенерированная иллюстрация волн — вращается медленно -->
-      <Image name="mic-listening" class="waves" />
-      <span class="pulse" aria-hidden="true"></span>
-    {/if}
-
     <button
       class="mic"
       class:listening
@@ -329,6 +322,9 @@
 
   .mic.listening {
     color: var(--good);
+    /* Пульсация чистой CSS-тенью: никаких картинок и transform: rotate.
+       Кольцо расходится от круглой кнопки, оставаясь круглым. */
+    animation: mic-pulse 1.6s ease-out infinite;
   }
 
   .mic.busy {
@@ -348,59 +344,23 @@
     place-items: center;
   }
 
-  /* Пульсация при записи — только transform/opacity */
-  .pulse {
-    position: absolute;
-    width: 72px;
-    height: 72px;
-    border-radius: 50%;
-    background: var(--good);
-    opacity: 0.18;
-    animation: pulse 2s ease-out infinite;
-    pointer-events: none;
-  }
-
-  /* Иллюстрация волн вокруг микрофона во время записи */
-  .mic-wrap :global(.waves) {
-    position: absolute;
-    width: 132px;
-    height: 132px;
-    object-fit: contain;
-    opacity: 0.35;
-    mix-blend-mode: screen;
-    pointer-events: none;
-    animation: waves-spin 12s linear infinite;
-  }
-
-  @keyframes waves-spin {
-    from {
-      transform: rotate(0deg);
-    }
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  /* На светлых темах screen-блендинг даст белое пятно — используем multiply */
-  :global(html[data-theme='light']) .mic-wrap :global(.waves),
-  :global(html[data-theme='sepia']) .mic-wrap :global(.waves),
-  :global(html[data-theme='system']) .mic-wrap :global(.waves) {
-    mix-blend-mode: multiply;
-    opacity: 0.22;
-  }
-
-  @keyframes pulse {
+  @keyframes mic-pulse {
     0% {
-      transform: scale(1);
-      opacity: 0.22;
+      box-shadow: 0 0 0 0 rgba(200, 160, 90, 0.6);
     }
     70% {
-      transform: scale(1.35);
-      opacity: 0;
+      box-shadow: 0 0 0 20px rgba(200, 160, 90, 0);
     }
     100% {
-      transform: scale(1.35);
-      opacity: 0;
+      box-shadow: 0 0 0 0 rgba(200, 160, 90, 0);
+    }
+  }
+
+  /* Уважаем системную настройку «уменьшить движение» */
+  @media (prefers-reduced-motion: reduce) {
+    .mic.listening {
+      animation: none;
+      box-shadow: 0 0 0 4px rgba(200, 160, 90, 0.35);
     }
   }
 

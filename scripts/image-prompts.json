@@ -23,9 +23,12 @@
       "prompt": "Ancient scroll and quill pen, minimalist line art, warm sepia tones, no text",
       "size": "1024x1024",
       "model": "gpt-image-1"
-    },
+    }
+  ],
+  "_unused": [
     {
       "name": "mic-listening",
+      "reason": "gpt-image-1 не поддерживает прозрачность: получался непрозрачный квадрат вокруг круглой кнопки. Пульсация микрофона сделана на чистом CSS (box-shadow).",
       "prompt": "Abstract circular sound waves, minimal, warm bronze and gold tones, no text, centered composition, transparent-friendly",
       "size": "1024x1024",
       "model": "gpt-image-1"

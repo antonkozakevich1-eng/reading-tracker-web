@@ -30,59 +30,61 @@
     return Math.max(found, 0);
   });
 
-  /** Свайп от левого края для открытия. */
+  /**
+   * Свайп от левого края — открытие.
+   *
+   * Закрытие свайпом намеренно НЕ реализовано: жест конфликтовал
+   * с прокруткой списка песен (drawer закрывался вместо скролла).
+   * Закрывается кнопкой ✕, тапом по затемнению или кликом по песне.
+   */
   const EDGE = 24;
-  const THRESHOLD = 60;
+  const OPEN_THRESHOLD = 60;
 
   let startX = 0;
   let startY = 0;
-  let dragging = $state(false);
+  let tracking = $state(false);
   let dragX = $state(0);
 
   function onTouchStart(e: TouchEvent): void {
+    if (open) return;
+
     const t = e.touches[0];
     if (!t) return;
 
-    if (!open && t.clientX <= EDGE) {
-      // Начали от края — открываем
-      startX = t.clientX;
-      startY = t.clientY;
-      dragging = true;
-      dragX = 0;
-    } else if (open) {
-      startX = t.clientX;
-      startY = t.clientY;
-      dragging = true;
-      dragX = 0;
-    }
+    // Захватываем жест только у самого левого края экрана
+    if (t.clientX > EDGE) return;
+
+    startX = t.clientX;
+    startY = t.clientY;
+    tracking = true;
+    dragX = 0;
   }
 
   function onTouchMove(e: TouchEvent): void {
-    if (!dragging) return;
+    if (!tracking) return;
     const t = e.touches[0];
     if (!t) return;
 
     const dx = t.clientX - startX;
     const dy = t.clientY - startY;
 
-    // Если движение больше вертикальное — не мешаем прокрутке списка
-    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dx) < 20) {
-      dragging = false;
+    // Вертикальное движение — это прокрутка, не наш жест
+    if (Math.abs(dy) > Math.abs(dx)) {
+      tracking = false;
       dragX = 0;
       return;
     }
 
-    dragX = open ? Math.max(0, dx) : Math.min(0, dx);
+    // Тянем вправо от края — открываем
+    dragX = Math.min(0, dx);
   }
 
   function onTouchEnd(): void {
-    if (!dragging) return;
-    dragging = false;
+    if (!tracking) return;
+    tracking = false;
 
-    if (open && dragX > THRESHOLD) {
-      onClose?.();
-    } else if (!open && dragX < -THRESHOLD) {
-      // Свайп влево от края — открываем (родитель управляет open)
+    // Свайп влево от края — сигнал родителю открыть drawer
+    if (dragX < -OPEN_THRESHOLD) {
       onSeek?.(-1);
     }
     dragX = 0;
@@ -97,14 +99,11 @@
   function onKeyDown(e: KeyboardEvent): void {
     if (e.key === 'Escape') onClose?.();
   }
-
-  /** Смещение панели при перетаскивании. */
-  const panelOffset = $derived(open ? dragX : 0);
 </script>
 
 <svelte:window onkeydown={onKeyDown} />
 
-<!-- Зона захвата свайпа от левого края -->
+<!-- Зона захвата свайпа от левого края (только открытие) -->
 {#if !open}
   <div
     class="edge-zone"
@@ -118,22 +117,14 @@
 {#if open}
   <div
     class="scrim"
-    class:dragging
     role="button"
     tabindex="-1"
     onclick={onClose}
     onkeydown={(e) => e.key === 'Enter' && onClose?.()}
   ></div>
 
-  <aside
-    class="drawer"
-    class:dragging
-    style:transform="translateX({panelOffset}px)"
-    aria-label="Оглавление"
-    ontouchstart={onTouchStart}
-    ontouchmove={onTouchMove}
-    ontouchend={onTouchEnd}
-  >
+  <!-- Касания внутри drawer не перехватываются: список должен скроллиться -->
+  <aside class="drawer" aria-label="Оглавление">
     <div class="ornament" aria-hidden="true">
       <Image name="toc-ornament" class="ornament-img" />
     </div>
@@ -181,10 +172,6 @@
     transition: opacity 250ms ease-out;
   }
 
-  .scrim.dragging {
-    transition: none;
-  }
-
   .drawer {
     position: fixed;
     left: 0;
@@ -201,12 +188,8 @@
     padding-left: env(safe-area-inset-left);
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
     animation: slide-in 250ms ease-out;
-    will-change: transform;
-  }
-
-  .drawer.dragging {
-    animation: none;
-    transition: none;
+    /* Касания внутри drawer отдаём списку — он должен скроллиться */
+    touch-action: pan-y;
   }
 
   @keyframes slide-in {
@@ -280,6 +263,9 @@
     -webkit-overflow-scrolling: touch;
     padding: 0 8px 16px;
     contain: layout style paint;
+    /* Список прокручивается вертикально и не «тянет» за собой drawer */
+    touch-action: pan-y;
+    overscroll-behavior: contain;
   }
 
   .row {

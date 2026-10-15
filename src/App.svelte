@@ -54,6 +54,17 @@
   let wordsRead = $state(0);
   let wpm = $state(0);
 
+  // --- Подсказка «потерял место» ---
+  // Показывается не сразу и не поверх текста: тонкой полоской под шапкой.
+  const SEARCH_HINT_DELAY_MS = 3000;
+  const SEARCH_HINT_HIDE_MS = 5000;
+
+  /** Видна ли сейчас подсказка. */
+  let searchHintVisible = $state(false);
+  /** Пользователь закрыл её вручную — до следующего срабатывания не показываем. */
+  let searchHintDismissed = $state(false);
+  let searchHintTimer: ReturnType<typeof setTimeout> | null = null;
+
   const view = $derived($documentStore);
   const trackerState = $derived($trackerStore);
   const s = $derived($settings);
@@ -248,6 +259,54 @@
       ? Math.round((trackerState.currentWord * 100) / view.doc.size)
       : 0
   );
+
+  /**
+   * Подсказка о поиске места: показываем только если режим длится
+   * больше 3 секунд, и прячем через 5 секунд даже если он не закончился.
+   */
+  $effect(() => {
+    const searching = trackerState.searchMode;
+
+    if (searchHintTimer !== null) {
+      clearTimeout(searchHintTimer);
+      searchHintTimer = null;
+    }
+
+    if (!searching) {
+      // Поиск закончился — сбрасываем всё, включая «закрыто вручную»
+      searchHintVisible = false;
+      searchHintDismissed = false;
+      return;
+    }
+
+    if (searchHintDismissed) return;
+
+    // Не отвлекаем при быстром поиске
+    searchHintTimer = setTimeout(() => {
+      searchHintVisible = true;
+      searchHintTimer = setTimeout(() => {
+        searchHintVisible = false;
+        searchHintTimer = null;
+      }, SEARCH_HINT_HIDE_MS);
+    }, SEARCH_HINT_DELAY_MS);
+
+    return () => {
+      if (searchHintTimer !== null) {
+        clearTimeout(searchHintTimer);
+        searchHintTimer = null;
+      }
+    };
+  });
+
+  /** Закрыть подсказку вручную. */
+  function dismissSearchHint(): void {
+    searchHintVisible = false;
+    searchHintDismissed = true;
+    if (searchHintTimer !== null) {
+      clearTimeout(searchHintTimer);
+      searchHintTimer = null;
+    }
+  }
 </script>
 
 <div class="app">
@@ -261,6 +320,12 @@
   />
 
   <main class="main">
+    {#if searchHintVisible}
+      <button class="search-hint" onclick={dismissSearchHint} title="Удержите слово, чтобы указать место">
+        Ищу место… или удержите слово
+      </button>
+    {/if}
+
     {#if view.loading}
       <div class="center">
         <div class="loading-card">
@@ -296,10 +361,6 @@
 
     {#if toast}
       <div class="toast">{toast}</div>
-    {/if}
-
-    {#if trackerState.searchMode}
-      <div class="banner">Потерял место. Читайте дальше — я найду, или удержите слово пальцем.</div>
     {/if}
 
     {#if busy}
@@ -362,6 +423,14 @@
     position: relative;
     min-height: 0;
     overflow: hidden;
+    /* Подсказка занимает своё место, Reader — оставшееся */
+    display: flex;
+    flex-direction: column;
+  }
+
+  .main > :global(.reader) {
+    flex: 1;
+    min-height: 0;
   }
 
   .center {
@@ -447,20 +516,45 @@
     }
   }
 
-  .banner {
-    position: absolute;
-    top: 8px;
-    left: 50%;
-    transform: translateX(-50%);
-    max-width: calc(100% - 32px);
-    padding: 10px 14px;
-    border-radius: 12px;
-    background: var(--bg-elevated);
-    border: 1px solid var(--warn);
-    font-size: 13px;
+  /*
+   * Подсказка «потерял место»: тонкая полоска В ПОТОКЕ под шапкой.
+   * В потоке, а не fixed — она сдвигает текст вниз, а не закрывает его.
+   */
+  .search-hint {
+    display: block;
+    width: calc(100% - 24px);
+    max-width: 420px;
+    margin: 6px auto 0;
+    min-height: 32px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--bg-panel) 93%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warn) 50%, transparent);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
     color: var(--warn);
+    font-size: 13px;
+    line-height: 1.2;
+    /* Одна строка: подсказка не должна занимать место в области чтения */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     text-align: center;
-    pointer-events: none;
+    animation: hint-in 250ms ease-out;
+  }
+
+  .search-hint:active {
+    opacity: 0.7;
+  }
+
+  @keyframes hint-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .busy-overlay {
