@@ -47,6 +47,8 @@ export interface ControllerState {
   locked: boolean;
   /** Идёт поиск места. */
   searchMode: boolean;
+  /** Распознанных слов подряд без подтверждения места (для диагностики). */
+  unconfirmedCount: number;
   /** Прогресс по документу, 0..1000 (как bookProgress в оригинале). */
   progress: number;
   /** Заголовок текущей секции. */
@@ -266,6 +268,7 @@ export class MainController {
         confidence: 0.5,
         locked: true,
         searchMode: false,
+        unconfirmedCount: 0,
         progress: 0,
         sectionTitle: '',
         percent: 0
@@ -282,6 +285,7 @@ export class MainController {
       confidence: t.confidence,
       locked: t.locked,
       searchMode: t.searchMode,
+      unconfirmedCount: t.unconfirmedCount,
       progress: Math.trunc((pos * 1000) / d.size),
       sectionTitle: sec?.title ?? '',
       percent: Math.trunc((pos * 100) / d.size)

@@ -176,6 +176,14 @@ export class TextTracker {
     return this.wordsSinceMove + Math.max(0, this.phraseWords - this.phraseAtMove);
   }
 
+  /**
+   * Сколько распознанных слов подряд не подтвердили место.
+   * Только для диагностики — значение уже используется внутри trackLost().
+   */
+  get unconfirmedCount(): number {
+    return this.unconfirmedWords();
+  }
+
   get confidence(): number {
     return this.confidenceField;
   }
