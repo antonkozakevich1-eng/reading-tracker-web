@@ -12,21 +12,11 @@
     /** Процент прочитанного, 0..100. */
     percent?: number;
     onToc?: () => void;
-    /** Тап по названию в центре (отдельно от кнопки оглавления). */
-    onTitleTap?: () => void;
     onSearch?: () => void;
     onSettings?: () => void;
   }
 
-  let {
-    title = '',
-    chapter = '',
-    percent = 0,
-    onToc,
-    onTitleTap,
-    onSearch,
-    onSettings
-  }: Props = $props();
+  let { title = '', chapter = '', percent = 0, onToc, onSearch, onSettings }: Props = $props();
 </script>
 
 <header class="header">
@@ -36,9 +26,10 @@
     </svg>
   </button>
 
-  <button class="center" onclick={onTitleTap ?? onToc} aria-label="Открыть оглавление">
+  <!-- Название песни: только показывает, оглавление открывает кнопка слева -->
+  <div class="center">
     <span class="chapter">{chapter || title}</span>
-  </button>
+  </div>
 
   <div class="right">
     <button class="icon-btn" onclick={onSearch} aria-label="Поиск">

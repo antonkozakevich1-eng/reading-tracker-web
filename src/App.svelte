@@ -16,7 +16,6 @@
   import SearchDialog from './components/SearchDialog.svelte';
   import SettingsPanel from './components/SettingsPanel.svelte';
   import Image from './components/Image.svelte';
-  import DiagnosticsPanel from './components/DiagnosticsPanel.svelte';
   import { SpeechEngine, MODEL_SIZE_MB } from './lib/speech/SpeechEngine';
   import {
     documentStore,
@@ -32,12 +31,6 @@
   import { loadFile } from './lib/io/TextLoader';
   import { MainController, type EngineKind } from './lib/MainController';
   import { DOC_ASSET, ENGINE_VOSK } from './lib/settings';
-  import {
-    diagStore,
-    setDiagEnabled,
-    recordSpeech,
-    recordTracker
-  } from './stores/diagnostics';
 
   let fileInput: HTMLInputElement | undefined = $state();
 
@@ -75,63 +68,6 @@
   const view = $derived($documentStore);
   const trackerState = $derived($trackerStore);
   const s = $derived($settings);
-  const diag = $derived($diagStore);
-
-  // --- Диагностика: включение флагом ?debug=1 или пятью тапами по шапке ---
-  const DEBUG_TAPS = 5;
-  const TAP_WINDOW_MS = 2000;
-  let tapCount = 0;
-  let lastTapAt = 0;
-
-  /**
-   * Тап по названию песни в шапке.
-   *
-   * Первые четыре тапа подряд ничего не открывают — иначе drawer
-   * перекрывал бы следующие тапы. На пятом включается диагностика.
-   * Открытие оглавления с центра убрано: для этого есть кнопка слева,
-   * а серия тапов иначе невозможна.
-   */
-  function onTitleTap(): void {
-    const now = Date.now();
-    if (now - lastTapAt > TAP_WINDOW_MS) tapCount = 0;
-    lastTapAt = now;
-    tapCount++;
-
-    if (tapCount >= DEBUG_TAPS) {
-      tapCount = 0;
-      setDiagEnabled(!diag.enabled);
-    }
-  }
-
-  // Флаг в URL включает панель сразу
-  $effect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('debug') === '1') setDiagEnabled(true);
-  });
-
-  /**
-   * Фиксирует результат обработки речи для диагностики.
-   * Вызывается ПОСЛЕ controller.onSpeech*, поэтому видит итоговое состояние.
-   * Ничего не меняет — только читает.
-   */
-  function trackDiag(kind: 'final' | 'partial', text: string, posBefore: number): void {
-    const t = controller.getTracker();
-    if (!t) return;
-
-    const st = controller.getState();
-    const moved = t.position !== posBefore;
-
-    recordTracker(kind, text, {
-      pos: t.position,
-      // move === null означает: трекер не принял решение о сдвиге
-      move: moved,
-      far: moved ? Math.abs(t.position - posBefore) > 40 : null,
-      confidence: t.confidence,
-      searchMode: t.searchMode,
-      unconfirmed: st.unconfirmedCount,
-      section: st.sectionIndex
-    });
-  }
 
   const controller = new MainController({
     onCursorRendered: (force) => {
@@ -154,18 +90,8 @@
 
   /** Движок распознавания — тот же, что был в SpeechProbe. */
   const engine = new SpeechEngine({
-    onPartial: (text) => {
-      const before = controller.getTracker()?.position ?? 0;
-      recordSpeech('partial', text);
-      controller.onSpeechPartial(text);
-      if (diag.enabled) trackDiag('partial', text, before);
-    },
-    onFinal: (text) => {
-      const before = controller.getTracker()?.position ?? 0;
-      recordSpeech('final', text);
-      controller.onSpeechFinal(text);
-      if (diag.enabled) trackDiag('final', text, before);
-    },
+    onPartial: (text) => controller.onSpeechPartial(text),
+    onFinal: (text) => controller.onSpeechFinal(text),
     onLevel: (l) => {
       level = l;
     },
@@ -389,7 +315,6 @@
     chapter={controller.getState().sectionTitle}
     {percent}
     onToc={() => (showToc = true)}
-    onTitleTap={onTitleTap}
     onSearch={() => (showSearch = true)}
     onSettings={() => (showSettings = true)}
   />
@@ -444,10 +369,6 @@
       </div>
     {/if}
   </main>
-
-  {#if diag.enabled}
-    <DiagnosticsPanel />
-  {/if}
 
   <BottomBar
     {listening}
